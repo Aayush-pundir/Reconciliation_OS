@@ -1,0 +1,29 @@
+import { Navigate, Route, Routes } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import Layout from "@/components/Layout";
+import Login from "@/pages/Login";
+import Dashboard from "@/pages/Dashboard";
+import ModuleRun from "@/pages/ModuleRun";
+import RunDetail from "@/pages/RunDetail";
+import RunHistory from "@/pages/RunHistory";
+
+function ProtectedLayout() {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <Layout />;
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route element={<ProtectedLayout />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/modules/:moduleKey" element={<ModuleRun />} />
+        <Route path="/runs" element={<RunHistory />} />
+        <Route path="/runs/:runId" element={<RunDetail />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
