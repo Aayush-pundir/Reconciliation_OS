@@ -60,6 +60,13 @@ export default function RunDetail() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["runs"] }),
   });
 
+  const annotateMutation = useMutation({
+    mutationFn: ({ resultId, status, note }: { resultId: string; status: string; note: string }) =>
+      api.annotateResult(runId!, resultId, status, note),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["run", runId, "results", "sheet", activeTab] }),
+  });
+
   const run = runQuery.data;
   if (!run) return <div className="text-sm text-ink-faint">Loading…</div>;
 
@@ -137,8 +144,10 @@ export default function RunDetail() {
               {sheetQuery.data && (
                 <DataTable
                   columns={sheetQuery.data.items[0]?.columns ?? Object.keys(sheetQuery.data.items[0]?.payload ?? {})}
-                  rows={sheetQuery.data.items.map((i) => i.payload)}
+                  items={sheetQuery.data.items}
                   statusColumn="Status"
+                  annotatable={sheetQuery.data.items[0]?.kind === "exception"}
+                  onAnnotate={(resultId, status, note) => annotateMutation.mutate({ resultId, status, note })}
                 />
               )}
             </div>

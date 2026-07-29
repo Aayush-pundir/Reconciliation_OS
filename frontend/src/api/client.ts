@@ -1,4 +1,4 @@
-import type { ModuleSchema, RunDetail, RunListPage, RunResultPage, User } from "@/types";
+import type { ModuleSchema, RunDetail, RunListPage, RunResultItem, RunResultPage, User } from "@/types";
 
 export interface TokenResponse {
   access_token: string;
@@ -90,6 +90,12 @@ export const api = {
   downloadReportUrl: (id: string) => `/api/runs/${id}/report`,
 
   rerun: (id: string) => request<RunDetail>(`/runs/${id}/rerun`, { method: "POST" }),
+
+  annotateResult: (runId: string, resultId: string, status: string, note: string) =>
+    request<RunResultItem>(`/runs/${runId}/results/${resultId}/annotate`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, note: note || null }),
+    }),
 
   importReport: (moduleKey: string, file: File) => {
     const form = new FormData();

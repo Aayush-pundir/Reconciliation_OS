@@ -77,11 +77,15 @@ export interface RunDetail extends Run {
 }
 
 export interface RunResultItem {
+  id: string | null;
   kind: SheetKind;
   sheet_name: string;
   columns: string[] | null;
   row_index: number;
   payload: Record<string, unknown>;
+  annotation_status: string | null;
+  annotation_note: string | null;
+  annotation_at: string | null;
 }
 
 export interface RunResultPage {
