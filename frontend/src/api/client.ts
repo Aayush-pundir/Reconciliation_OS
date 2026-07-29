@@ -1,4 +1,4 @@
-import type { ModuleSchema, RunDetail, RunListPage, RunResultItem, RunResultPage, User } from "@/types";
+import type { ModuleConfig, ModuleSchema, RunDetail, RunListPage, RunResultItem, RunResultPage, User } from "@/types";
 
 export interface TokenResponse {
   access_token: string;
@@ -95,6 +95,14 @@ export const api = {
     request<RunResultItem>(`/runs/${runId}/results/${resultId}/annotate`, {
       method: "PATCH",
       body: JSON.stringify({ status, note: note || null }),
+    }),
+
+  listModuleConfigs: () => request<ModuleConfig[]>("/admin/module-configs"),
+
+  updateModuleConfig: (moduleKey: string, defaultOptions: Record<string, unknown>) =>
+    request<ModuleConfig>(`/admin/module-configs/${moduleKey}`, {
+      method: "PUT",
+      body: JSON.stringify({ default_options: defaultOptions }),
     }),
 
   importReport: (moduleKey: string, file: File) => {

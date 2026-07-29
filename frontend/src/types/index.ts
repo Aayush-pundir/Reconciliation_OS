@@ -110,6 +110,12 @@ export interface StatCardPayload {
   sub?: string | null;
 }
 
+export interface ModuleConfig {
+  module_key: string;
+  default_options: Record<string, unknown>;
+  updated_at: string | null;
+}
+
 export interface ValidationFindingPayload {
   pass_name: string;
   check: string;

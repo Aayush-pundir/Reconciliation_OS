@@ -6,6 +6,7 @@ import Dashboard from "@/pages/Dashboard";
 import ModuleRun from "@/pages/ModuleRun";
 import RunDetail from "@/pages/RunDetail";
 import RunHistory from "@/pages/RunHistory";
+import Admin from "@/pages/Admin";
 
 function ProtectedLayout() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/modules/:moduleKey" element={<ModuleRun />} />
         <Route path="/runs" element={<RunHistory />} />
         <Route path="/runs/:runId" element={<RunDetail />} />
+        <Route path="/admin" element={<Admin />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -2,13 +2,15 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { getToken } from "@/api/client";
 
-const navItems = [
+const BASE_NAV_ITEMS = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/runs", label: "Run History", end: false },
 ];
+const ADMIN_NAV_ITEM = { to: "/admin", label: "Admin", end: false };
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const navItems = user?.role === "admin" ? [...BASE_NAV_ITEMS, ADMIN_NAV_ITEM] : BASE_NAV_ITEMS;
 
   return (
     <div className="min-h-screen flex flex-col">
