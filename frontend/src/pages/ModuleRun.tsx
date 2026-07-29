@@ -13,6 +13,7 @@ export default function ModuleRun() {
   const [filesBySlot, setFilesBySlot] = useState<Record<string, File[]>>({});
   const [options, setOptions] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const optionFields = useMemo(
     () => Object.entries(module?.options_schema.properties ?? {}),
@@ -23,6 +24,12 @@ export default function ModuleRun() {
     mutationFn: () => api.createRun(module!.key, options, filesBySlot),
     onSuccess: (run) => navigate(`/runs/${run.id}`),
     onError: (err) => setError(err instanceof ApiError ? err.message : "Failed to start run"),
+  });
+
+  const importMutation = useMutation({
+    mutationFn: (file: File) => api.importReport(module!.key, file),
+    onSuccess: (run) => navigate(`/runs/${run.id}`),
+    onError: (err) => setImportError(err instanceof ApiError ? err.message : "Failed to import report"),
   });
 
   if (modulesQuery.isLoading) return <div className="text-sm text-ink-faint">Loading…</div>;
@@ -90,6 +97,36 @@ export default function ModuleRun() {
           {runMutation.isPending ? "Starting…" : "⚡ Run Reconciliation"}
         </button>
         {!ready && <span className="text-xs text-ink-faint">Upload all required files to enable.</span>}
+      </div>
+
+      <div className="card p-5 flex flex-col gap-3">
+        <div>
+          <div className="text-xs font-bold uppercase tracking-wide text-ink-faint">Import a Past Report</div>
+          <p className="text-xs text-ink-faint mt-1">
+            Already have a report exported from Recon OS (or the original standalone tool)? Import it to archive
+            its numbers as a completed run - no re-parsing or re-reconciling.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="btn-ghost text-xs cursor-pointer">
+            {importMutation.isPending ? "Importing…" : "Choose Excel file…"}
+            <input
+              type="file"
+              accept=".xlsx,.xls,.xlsm"
+              className="hidden"
+              disabled={importMutation.isPending}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setImportError(null);
+                  importMutation.mutate(file);
+                }
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        {importError && <div className="text-xs text-bad bg-bad/5 border border-bad/20 rounded-lg px-3 py-2">{importError}</div>}
       </div>
     </div>
   );

@@ -45,9 +45,13 @@ def _persist_findings(db: Session, run_id: str, findings: list[ValidationFinding
 
 
 def _persist_output(db: Session, run_id: str, output: ReconOutput) -> None:
+    # "stats" is a reserved kind distinct from ReportSheet's "summary" kind:
+    # several modules (NFS, UPI) use kind="summary" for real tabular sheets
+    # (Daily Summary, Pivot) - sharing a kind with StatCard rows would mean
+    # the dashboard's stat-card query pulls in those data rows too.
     for i, stat in enumerate(output.stats):
         db.add(
-            RunResult(run_id=run_id, kind="summary", sheet_name="stats", row_index=i, payload=stat.model_dump())
+            RunResult(run_id=run_id, kind="stats", sheet_name="stats", row_index=i, payload=stat.model_dump())
         )
     for sheet in output.sheets:
         # row_index=-1 carries column order metadata for this sheet, once.

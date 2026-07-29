@@ -90,6 +90,13 @@ export const api = {
   downloadReportUrl: (id: string) => `/api/runs/${id}/report`,
 
   rerun: (id: string) => request<RunDetail>(`/runs/${id}/rerun`, { method: "POST" }),
+
+  importReport: (moduleKey: string, file: File) => {
+    const form = new FormData();
+    form.set("module_key", moduleKey);
+    form.set("file", file);
+    return request<RunDetail>("/runs/import", { method: "POST", body: form });
+  },
 };
 
 export { ApiError };

@@ -33,7 +33,7 @@ export default function RunDetail() {
 
   const summaryQuery = useQuery({
     queryKey: ["run", runId, "results", "summary"],
-    queryFn: () => api.getResults(runId!, { kind: "summary", limit: 100 }),
+    queryFn: () => api.getResults(runId!, { kind: "stats", limit: 100 }),
     enabled: !!runId && isDone,
   });
 

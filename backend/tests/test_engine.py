@@ -78,7 +78,7 @@ def test_execute_run_transitions_and_persists_results(tmp_path, monkeypatch):
 
     results = db.query(RunResult).filter(RunResult.run_id == run_id).all()
     kinds = {r.kind for r in results}
-    assert "summary" in kinds
+    assert "stats" in kinds  # StatCard rows - reserved kind, distinct from ReportSheet's own "summary"
     assert "detail" in kinds
     assert "validation" in kinds
     db.close()

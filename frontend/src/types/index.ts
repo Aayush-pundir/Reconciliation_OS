@@ -94,9 +94,11 @@ export interface RunListPage {
   items: Run[];
 }
 
-// Stat cards and validation findings arrive as `kind: "summary"` / `kind: "validation"`
+// Stat cards and validation findings arrive as `kind: "stats"` / `kind: "validation"`
 // RunResult rows respectively - these shapes mirror ReconOutput.StatCard / ValidationFinding
-// on the backend (app/recon/base.py).
+// on the backend (app/recon/base.py). "stats" is reserved for engine-persisted
+// StatCard rows, distinct from ReportSheet's own "summary" kind (some modules'
+// own tabular summary sheets, e.g. NFS/UPI's Daily Summary, use kind="summary").
 export interface StatCardPayload {
   label: string;
   value: string;
