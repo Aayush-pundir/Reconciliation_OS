@@ -6,16 +6,20 @@ this file has zero module-specific logic.
 """
 from __future__ import annotations
 
+import logging
 import traceback
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
+from app.core.notify import get_notifier
 from app.core.storage import get_storage
 from app.models import Run, RunArtifact, RunEvent, RunFile, RunResult
 from app.recon.base import ReconOutput, RunContext, UploadedFile, ValidationFinding
 from app.recon.registry import get_module
+
+logger = logging.getLogger(__name__)
 
 
 def _transition(db: Session, run: Run, to_status: str, message: str | None = None) -> None:
@@ -42,6 +46,19 @@ def _persist_findings(db: Session, run_id: str, findings: list[ValidationFinding
             )
         )
     db.commit()
+
+
+def _notify(run: Run, status: str, detail: str = "") -> None:
+    """Best-effort: a notification failure (bad SMTP creds, Slack webhook
+    down, etc.) must never fail the run itself."""
+    try:
+        subject = f"Recon OS: {run.module_key} run {status}"
+        message = f"Run {run.id} ({run.module_key}) {status}."
+        if detail:
+            message += f"\n\n{detail}"
+        get_notifier().notify(subject, message)
+    except Exception:  # noqa: BLE001
+        logger.exception("Notification failed for run %s (status=%s)", run.id, status)
 
 
 def _persist_output(db: Session, run_id: str, output: ReconOutput) -> None:
@@ -83,6 +100,7 @@ def execute_run(run_id: str) -> None:
         module = get_module(run.module_key)
         if module is None:
             _transition(db, run, "failed", f"Unknown module '{run.module_key}'")
+            _notify(run, "failed", f"Unknown module '{run.module_key}'")
             return
 
         run.module_version = module.version
@@ -121,11 +139,13 @@ def execute_run(run_id: str) -> None:
         db.commit()
 
         _transition(db, run, "completed")
+        _notify(run, "completed")
     except Exception as exc:  # noqa: BLE001 - top-level job boundary; must never crash the worker
         db.rollback()
         run = db.get(Run, run_id)
         if run is not None:
             trace = traceback.format_exc()[-4000:]
             _transition(db, run, "failed", f"{exc}\n{trace}")
+            _notify(run, "failed", str(exc))
     finally:
         db.close()

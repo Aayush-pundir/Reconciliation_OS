@@ -47,6 +47,17 @@ class Settings(BaseSettings):
     seed_admin_email: str = "admin@eroute.local"
     seed_admin_password: str = "ChangeMe123!"
 
+    # Notifications - off by default (zero-infra dev path, matches
+    # job_runner/storage_backend). Set to "email", "slack", or "both".
+    notify_backend: str = "none"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "recon-os@eroute.local"
+    notify_email_to: list[str] = []
+    slack_webhook_url: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:
