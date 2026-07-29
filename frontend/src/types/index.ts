@@ -128,6 +128,18 @@ export interface ApiKeyCreated extends ApiKey {
   api_key: string;
 }
 
+export interface RecurringSchedule {
+  id: string;
+  name: string;
+  module_key: string;
+  source_run_id: string;
+  interval_minutes: number;
+  enabled: boolean;
+  last_fired_at: string | null;
+  last_run_id: string | null;
+  created_at: string;
+}
+
 export interface ValidationFindingPayload {
   pass_name: string;
   check: string;

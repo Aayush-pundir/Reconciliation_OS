@@ -3,6 +3,7 @@ import type {
   ApiKeyCreated,
   ModuleConfig,
   ModuleSchema,
+  RecurringSchedule,
   RunDetail,
   RunListPage,
   RunResultItem,
@@ -114,6 +115,19 @@ export const api = {
   createApiKey: (name: string) => request<ApiKeyCreated>("/api-keys", { method: "POST", body: JSON.stringify({ name }) }),
 
   revokeApiKey: (id: string) => request<void>(`/api-keys/${id}`, { method: "DELETE" }),
+
+  listSchedules: () => request<RecurringSchedule[]>("/schedules"),
+
+  createSchedule: (name: string, sourceRunId: string, intervalMinutes: number) =>
+    request<RecurringSchedule>("/schedules", {
+      method: "POST",
+      body: JSON.stringify({ name, source_run_id: sourceRunId, interval_minutes: intervalMinutes }),
+    }),
+
+  updateSchedule: (id: string, patch: { enabled?: boolean; interval_minutes?: number }) =>
+    request<RecurringSchedule>(`/schedules/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+
+  deleteSchedule: (id: string) => request<void>(`/schedules/${id}`, { method: "DELETE" }),
 
   updateModuleConfig: (moduleKey: string, defaultOptions: Record<string, unknown>) =>
     request<ModuleConfig>(`/admin/module-configs/${moduleKey}`, {

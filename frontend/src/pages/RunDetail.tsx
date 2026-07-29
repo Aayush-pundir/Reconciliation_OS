@@ -19,6 +19,9 @@ export default function RunDetail() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [scheduleName, setScheduleName] = useState("");
+  const [scheduleInterval, setScheduleInterval] = useState(1440);
 
   const runQuery = useQuery({
     queryKey: ["run", runId],
@@ -77,6 +80,16 @@ export default function RunDetail() {
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to save annotation"),
   });
 
+  const scheduleMutation = useMutation({
+    mutationFn: () => api.createSchedule(scheduleName.trim(), runId!, scheduleInterval),
+    onSuccess: () => {
+      toast.success("Recurring schedule created - manage it from Admin.");
+      setShowScheduleForm(false);
+      setScheduleName("");
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to create schedule"),
+  });
+
   const run = runQuery.data;
   if (!run)
     return (
@@ -120,8 +133,40 @@ export default function RunDetail() {
           <button onClick={() => rerunMutation.mutate()} className="btn-secondary" disabled={rerunMutation.isPending}>
             ↺ {rerunMutation.isPending ? "Re-queuing…" : "Re-run"}
           </button>
+          {run.status === "completed" && (
+            <button onClick={() => setShowScheduleForm((v) => !v)} className="btn-secondary">
+              🔁 Schedule
+            </button>
+          )}
         </div>
       </div>
+
+      {showScheduleForm && (
+        <div className="card p-4 flex items-center gap-3">
+          <input
+            className="input flex-1"
+            placeholder="Schedule name (e.g. Nightly NFS recon)"
+            value={scheduleName}
+            onChange={(e) => setScheduleName(e.target.value)}
+          />
+          <select
+            className="input max-w-[160px]"
+            value={scheduleInterval}
+            onChange={(e) => setScheduleInterval(Number(e.target.value))}
+          >
+            <option value={60}>Hourly</option>
+            <option value={1440}>Daily</option>
+            <option value={10080}>Weekly</option>
+          </select>
+          <button
+            onClick={() => scheduleMutation.mutate()}
+            disabled={!scheduleName.trim() || scheduleMutation.isPending}
+            className="btn-primary shrink-0"
+          >
+            {scheduleMutation.isPending ? "Creating…" : "Create"}
+          </button>
+        </div>
+      )}
 
       <div className="card p-5">
         <ProgressStages status={run.status} />

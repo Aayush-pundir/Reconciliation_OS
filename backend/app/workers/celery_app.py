@@ -14,7 +14,7 @@ celery_app = Celery(
     "recon_os",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["app.workers.tasks"],
+    include=["app.workers.tasks", "app.workers.beat"],
 )
 celery_app.conf.update(
     task_serializer="json",
@@ -24,4 +24,10 @@ celery_app.conf.update(
     enable_utc=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    beat_schedule={
+        # Polls every 60s for due RecurringSchedules (see app/workers/beat.py).
+        # Poll frequency is independent of any individual schedule's own
+        # interval_minutes - it's just how often we check what's due.
+        "check-recurring-schedules": {"task": "recon_os.check_recurring_schedules", "schedule": 60.0},
+    },
 )

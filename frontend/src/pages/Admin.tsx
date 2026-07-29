@@ -176,6 +176,76 @@ function ModuleConfigCard({
   );
 }
 
+const INTERVAL_LABELS: Record<number, string> = { 60: "Hourly", 1440: "Daily", 10080: "Weekly" };
+
+function SchedulesSection() {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const schedulesQuery = useQuery({ queryKey: ["admin", "schedules"], queryFn: api.listSchedules });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => api.updateSchedule(id, { enabled }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "schedules"] }),
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to update schedule"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.deleteSchedule(id),
+    onSuccess: () => {
+      toast.success("Schedule deleted.");
+      queryClient.invalidateQueries({ queryKey: ["admin", "schedules"] });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to delete schedule"),
+  });
+
+  const schedules = schedulesQuery.data ?? [];
+
+  return (
+    <div className="card p-4 flex flex-col gap-2">
+      <p className="text-xs text-ink-faint">
+        Created from a completed run's detail page ("🔁 Schedule"). Fires on a Celery-beat poller - requires the{" "}
+        <code className="font-mono">beat</code> service to be running (see docker-compose.yml); has no effect under
+        the zero-infra in-process job runner.
+      </p>
+      <div className="divide-y divide-surface-border -mx-4 mt-2">
+        {schedulesQuery.isLoading && <div className="px-4 py-3 text-xs text-ink-faint">Loading…</div>}
+        {!schedulesQuery.isLoading && schedules.length === 0 && (
+          <div className="px-4 py-3 text-xs text-ink-faint">No recurring schedules yet.</div>
+        )}
+        {schedules.map((s) => (
+          <div key={s.id} className="px-4 py-2.5 flex items-center justify-between text-xs">
+            <div>
+              <span className="font-medium">{s.name}</span>{" "}
+              <span className="text-ink-faint capitalize">· {s.module_key.replace(/_/g, " ")}</span>{" "}
+              <span className="text-ink-faint">· {INTERVAL_LABELS[s.interval_minutes] ?? `every ${s.interval_minutes}m`}</span>
+              {!s.enabled && <span className="ml-2 text-warn font-semibold">PAUSED</span>}
+              <div className="text-[11px] text-ink-faint mt-0.5">
+                Last fired: {s.last_fired_at ? new Date(s.last_fired_at).toLocaleString() : "never"}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => toggleMutation.mutate({ id: s.id, enabled: !s.enabled })}
+                disabled={toggleMutation.isPending}
+                className="btn-ghost text-xs"
+              >
+                {s.enabled ? "Pause" : "Resume"}
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate(s.id)}
+                disabled={deleteMutation.isPending}
+                className="text-bad hover:underline"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Admin() {
   const modulesQuery = useQuery({ queryKey: ["modules"], queryFn: api.listModules });
   const configsQuery = useQuery({ queryKey: ["admin", "module-configs"], queryFn: api.listModuleConfigs });
@@ -205,6 +275,11 @@ export default function Admin() {
       <div>
         <h2 className="text-sm font-bold text-ink-muted mb-3 uppercase tracking-wide">API Keys</h2>
         <ApiKeysSection />
+      </div>
+
+      <div>
+        <h2 className="text-sm font-bold text-ink-muted mb-3 uppercase tracking-wide">Recurring Schedules</h2>
+        <SchedulesSection />
       </div>
     </div>
   );
