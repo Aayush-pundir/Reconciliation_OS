@@ -10,10 +10,12 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // Deliberately not 5173 (Vite's default) - avoids colliding with other
+    // projects' dev servers running locally at the same time.
+    port: 7401,
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: "http://localhost:7400",
         changeOrigin: true,
       },
     },

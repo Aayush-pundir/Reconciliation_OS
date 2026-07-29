@@ -1,6 +1,10 @@
 # Recon OS - full stack. `docker compose up --build` gives you:
-#   frontend  -> http://localhost:5173
-#   backend   -> http://localhost:8000  (docs at /docs)
+#   frontend  -> http://localhost:7401
+#   backend   -> http://localhost:7400  (docs at /docs)
+#   postgres  -> localhost:7402
+#   redis     -> localhost:7403
+# Ports deliberately avoid common defaults (5173/8000/5432/6379) that
+# tend to collide with other projects running locally at the same time.
 # Default seeded login: admin@eroute.local / ChangeMe123!  (change in prod)
 #
 # Scaling: `docker compose up --scale worker=4` adds worker capacity for
@@ -17,7 +21,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "7402:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U recon"]
       interval: 5s
@@ -27,7 +31,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "7403:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -44,13 +48,13 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       STORAGE_BACKEND: local
       STORAGE_LOCAL_ROOT: /data/storage
-      CORS_ORIGINS: '["http://localhost:5173"]'
+      CORS_ORIGINS: '["http://localhost:7401"]'
       SEED_ADMIN_EMAIL: admin@eroute.local
       SEED_ADMIN_PASSWORD: ChangeMe123!
     volumes:
       - storage:/data/storage
     ports:
-      - "8000:8000"
+      - "7400:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -99,7 +103,7 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "5173:80"
+      - "7401:80"
     depends_on:
       - backend
 

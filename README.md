@@ -62,7 +62,7 @@ Every original tool solved one reconciliation problem well, in isolation: open a
                              │ REST (fetch), polled for live status
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                  Backend (FastAPI, port 8000)                   │
+│                  Backend (FastAPI, port 7400)                   │
 │  ├─ routes_auth      login / current-user resolution            │
 │  ├─ routes_modules   module schema discovery (input slots, opts)│
 │  ├─ routes_runs      create / list / detail / results / report /│
@@ -76,7 +76,7 @@ Every original tool solved one reconciliation problem well, in isolation: open a
 ┌─────────────┐         ┌──────────────────┐         ┌───────────────┐
 │  Job Runner  │         │   PostgreSQL     │         │  File Storage  │
 │ Celery worker│         │  Run/RunFile/    │         │ local fs / S3  │
-│  (port 6379  │         │  RunResult/...   │         └───────────────┘
+│  (port 7403  │         │  RunResult/...   │         └───────────────┘
 │   via Redis) │         └──────────────────┘
 └──────┬───────┘
        │ execute_run(): parse → validate → reconcile → build_report
@@ -179,7 +179,7 @@ docker compose up --scale worker=4
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-JOB_RUNNER=inprocess DATABASE_URL="sqlite:///./recon_os.db" uvicorn app.main:app --reload --port 8000
+JOB_RUNNER=inprocess DATABASE_URL="sqlite:///./recon_os.db" uvicorn app.main:app --reload --port 7400
 ```
 
 **Frontend:**
@@ -190,7 +190,7 @@ npm install
 npm run dev
 ```
 
-Vite proxies `/api` to `http://localhost:8000` (`frontend/vite.config.ts`) — no CORS setup needed for local dev.
+Vite proxies `/api` to `http://localhost:7400` (`frontend/vite.config.ts`) — no CORS setup needed for local dev.
 
 **Tests:**
 
@@ -231,10 +231,17 @@ Every service gets its own, non-overlapping port — no two services in this sta
 
 | Service | Port | Purpose |
 |---|---|---|
-| Frontend | `5173` | React app (dev server, or nginx in Docker) |
-| Backend | `8000` | FastAPI + interactive docs at `/docs` |
-| PostgreSQL | `5432` | Primary database |
-| Redis | `6379` | Celery broker + result backend |
+| Frontend | `7401` | React app (dev server, or nginx in Docker) |
+| Backend | `7400` | FastAPI + interactive docs at `/docs` |
+| PostgreSQL | `7402` | Primary database |
+| Redis | `7403` | Celery broker + result backend |
+
+Deliberately not 5173/8000/5432/6379 — those are common defaults across many
+stacks and tend to collide with other projects running locally at the same
+time. Container-to-container communication inside Docker Compose (e.g. the
+backend reaching Postgres, or the frontend's nginx proxying to the backend)
+uses the Docker-internal network and is unaffected by these host-side port
+choices.
 
 (`worker` and `beat` are background processes with no exposed port.)
 

@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     max_upload_mb: int = 200
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    cors_origins: list[str] = ["http://localhost:7401"]
 
     # Default seed admin (dev convenience only)
     seed_admin_email: str = "admin@eroute.local"
