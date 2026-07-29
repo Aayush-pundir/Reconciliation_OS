@@ -1,4 +1,14 @@
-import type { ModuleConfig, ModuleSchema, RunDetail, RunListPage, RunResultItem, RunResultPage, User } from "@/types";
+import type {
+  ApiKey,
+  ApiKeyCreated,
+  ModuleConfig,
+  ModuleSchema,
+  RunDetail,
+  RunListPage,
+  RunResultItem,
+  RunResultPage,
+  User,
+} from "@/types";
 
 export interface TokenResponse {
   access_token: string;
@@ -98,6 +108,12 @@ export const api = {
     }),
 
   listModuleConfigs: () => request<ModuleConfig[]>("/admin/module-configs"),
+
+  listApiKeys: () => request<ApiKey[]>("/api-keys"),
+
+  createApiKey: (name: string) => request<ApiKeyCreated>("/api-keys", { method: "POST", body: JSON.stringify({ name }) }),
+
+  revokeApiKey: (id: string) => request<void>(`/api-keys/${id}`, { method: "DELETE" }),
 
   updateModuleConfig: (moduleKey: string, defaultOptions: Record<string, unknown>) =>
     request<ModuleConfig>(`/admin/module-configs/${moduleKey}`, {

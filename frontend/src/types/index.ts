@@ -116,6 +116,18 @@ export interface ModuleConfig {
   updated_at: string | null;
 }
 
+export interface ApiKey {
+  id: string;
+  name: string;
+  key_prefix: string;
+  created_at: string;
+  revoked_at: string | null;
+}
+
+export interface ApiKeyCreated extends ApiKey {
+  api_key: string;
+}
+
 export interface ValidationFindingPayload {
   pass_name: string;
   check: string;
