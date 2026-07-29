@@ -6,9 +6,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes_admin import router as admin_router
+from app.api.routes_api_keys import router as api_keys_router
 from app.api.routes_auth import router as auth_router
 from app.api.routes_modules import router as modules_router
 from app.api.routes_runs import router as runs_router
+from app.api.routes_schedules import router as schedules_router
 from app.core.config import get_settings
 from app.core.database import SessionLocal, init_db
 from app.core.security import hash_password
@@ -57,6 +60,9 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(modules_router)
 app.include_router(runs_router)
+app.include_router(api_keys_router)
+app.include_router(admin_router)
+app.include_router(schedules_router)
 
 
 @app.get("/api/health")

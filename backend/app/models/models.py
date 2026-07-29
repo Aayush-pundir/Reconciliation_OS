@@ -82,6 +82,14 @@ class RunResult(Base):
     row_index: Mapped[int] = mapped_column(default=0)
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
 
+    # Bulk exception actions (PRD fast-follow): analysts can acknowledge/note
+    # an exception row without needing a separate join table, since each
+    # RunResult row already *is* one exception line item.
+    annotation_status: Mapped[str | None] = mapped_column(String(32), nullable=True)  # acknowledged | resolved
+    annotation_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    annotation_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    annotation_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     run: Mapped[Run] = relationship(back_populates="results")
 
 
@@ -108,3 +116,51 @@ class RunArtifact(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     run: Mapped[Run] = relationship(back_populates="artifacts")
+
+
+class ApiKey(Base):
+    """Service-to-service credential, separate from human login (which is
+    optional/off by default). Callers send the raw key once at creation
+    time; only its salted hash is ever persisted."""
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String(255))
+    key_prefix: Mapped[str] = mapped_column(String(12))  # shown in UI so the key is identifiable post-creation
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ModuleConfig(Base):
+    """Org-level default options per module (admin-configurable), used as
+    the base a run's own options are layered on top of."""
+
+    __tablename__ = "module_configs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    module_key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    default_options: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+    updated_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+
+
+class RecurringSchedule(Base):
+    """Periodically re-runs a saved run's exact input file set (rerun
+    mechanics, on a timer) - a Celery-beat task polls for due schedules.
+    See app/workers/beat.py."""
+
+    __tablename__ = "recurring_schedules"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String(255))
+    module_key: Mapped[str] = mapped_column(String(64), index=True)
+    source_run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"))
+    interval_minutes: Mapped[int] = mapped_column(default=1440)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_fired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_run_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("runs.id"), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

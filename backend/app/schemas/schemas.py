@@ -74,11 +74,15 @@ class RunDetailOut(RunOut):
 
 
 class RunResultOut(BaseModel):
+    id: str | None = None
     kind: str
     sheet_name: str
     columns: list[str] | None = None
     row_index: int
     payload: dict[str, Any]
+    annotation_status: str | None = None
+    annotation_note: str | None = None
+    annotation_at: datetime | None = None
 
 
 class RunResultPage(BaseModel):
@@ -89,3 +93,63 @@ class RunResultPage(BaseModel):
 class RunListPage(BaseModel):
     total: int
     items: list[RunOut]
+
+
+class AnnotateResultRequest(BaseModel):
+    status: str  # "acknowledged" | "resolved" | "" (clear)
+    note: str | None = None
+
+
+class ApiKeyCreateRequest(BaseModel):
+    name: str
+
+
+class ApiKeyOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    name: str
+    key_prefix: str
+    created_at: datetime
+    revoked_at: datetime | None = None
+
+
+class ApiKeyCreatedOut(BaseModel):
+    id: str
+    name: str
+    key_prefix: str
+    created_at: datetime
+    api_key: str  # only ever returned once, at creation time
+
+
+class ModuleConfigOut(BaseModel):
+    module_key: str
+    default_options: dict[str, Any]
+    updated_at: datetime | None = None
+
+
+class ModuleConfigUpdateRequest(BaseModel):
+    default_options: dict[str, Any]
+
+
+class RecurringScheduleCreateRequest(BaseModel):
+    name: str
+    source_run_id: str
+    interval_minutes: int = 1440
+
+
+class RecurringScheduleUpdateRequest(BaseModel):
+    enabled: bool | None = None
+    interval_minutes: int | None = None
+
+
+class RecurringScheduleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    name: str
+    module_key: str
+    source_run_id: str
+    interval_minutes: int
+    enabled: bool
+    last_fired_at: datetime | None = None
+    last_run_id: str | None = None
+    created_at: datetime

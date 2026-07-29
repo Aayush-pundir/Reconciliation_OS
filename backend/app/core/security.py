@@ -48,3 +48,21 @@ def decode_access_token(token: str) -> dict[str, Any] | None:
         return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except JWTError:
         return None
+
+
+# ── API keys (service-to-service auth, separate from human login) ──────────
+# Keys are high-entropy random tokens, not user-chosen passwords, so a fast
+# salted hash (SHA-256) is standard practice here - unlike passwords, there's
+# no offline-guessing risk to defend against with a slow hash like bcrypt.
+import secrets as _secrets
+
+
+def generate_api_key() -> tuple[str, str, str]:
+    """Returns (raw_key_to_show_once, prefix_for_display, hash_to_store)."""
+    raw = "rk_" + _secrets.token_urlsafe(32)
+    prefix = raw[:12]
+    return raw, prefix, hash_api_key(raw)
+
+
+def hash_api_key(raw: str) -> str:
+    return _hashlib.sha256(raw.encode("utf-8")).hexdigest()

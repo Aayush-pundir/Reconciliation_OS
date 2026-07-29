@@ -1,5 +1,6 @@
 """Run lifecycle API: create (upload+enqueue), list, detail, results,
-report download, rerun. See ARCHITECTURE.md §6 for the full contract.
+report download, rerun, legacy import, exception annotation. See
+ARCHITECTURE.md §6 for the full contract.
 
 Live status updates use short client-side polling on `GET /runs/{id}`
 rather than a websocket/SSE stream for v1 - simpler to operate, and the
@@ -11,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
@@ -20,9 +22,20 @@ from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.job_runner import get_job_runner
 from app.core.storage import get_storage
-from app.models import Run, RunArtifact, RunFile, RunResult, User
+from app.models import Run, RunArtifact, RunEvent, RunFile, RunResult, User
+from app.recon.importer import import_report as parse_legacy_report
+from app.recon.module_config import get_effective_options
 from app.recon.registry import get_module
-from app.schemas.schemas import RunDetailOut, RunEventOut, RunFileOut, RunListPage, RunOut, RunResultOut, RunResultPage
+from app.schemas.schemas import (
+    AnnotateResultRequest,
+    RunDetailOut,
+    RunEventOut,
+    RunFileOut,
+    RunListPage,
+    RunOut,
+    RunResultOut,
+    RunResultPage,
+)
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
@@ -47,9 +60,13 @@ async def create_run(request: Request, db: Session = Depends(get_db), user: User
         raise HTTPException(404, f"Unknown module '{module_key}'")
 
     try:
-        options = json.loads(str(form.get("options") or "{}"))
+        options_override = json.loads(str(form.get("options") or "{}"))
     except json.JSONDecodeError as exc:
         raise HTTPException(400, "options must be valid JSON") from exc
+
+    # Admin-configured org-level defaults (routes_admin.py) are the base;
+    # whatever this specific run passes overrides them.
+    options = get_effective_options(db, str(module_key), options_override)
 
     run = Run(module_key=str(module_key), status="created", triggered_by=user.id, options=options)
     db.add(run)
@@ -89,6 +106,67 @@ async def create_run(request: Request, db: Session = Depends(get_db), user: User
     db.add(run)
     db.commit()
     get_job_runner().enqueue(run.id)
+    db.refresh(run)
+    return RunOut.model_validate(run)
+
+
+@router.post("/import", response_model=RunOut, status_code=201)
+async def import_legacy_report(
+    request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> RunOut:
+    """Reconstructs a completed Run from a previously-exported report
+    (Recon OS's own export, or one of the original tools' exports - both
+    follow the same header-row-then-data-rows convention). Does not
+    re-run any module's parse/reconcile logic; it archives the report's
+    own numbers as-is, for run-history parity with pre-migration exports."""
+    form = await request.form()
+    module_key = str(form.get("module_key") or "")
+    module = get_module(module_key) if module_key else None
+    if module is None:
+        raise HTTPException(400, "A valid module_key is required")
+
+    file_value = form.get("file")
+    if not isinstance(file_value, StarletteUploadFile):
+        raise HTTPException(400, "file is required")
+    content = await file_value.read()
+
+    sheets = parse_legacy_report(content)
+    if not sheets:
+        raise HTTPException(400, "No readable sheets (with a header row) found in the uploaded workbook")
+
+    now = datetime.now(timezone.utc)
+    run = Run(
+        module_key=module_key, status="completed", triggered_by=user.id,
+        options={"imported": True}, started_at=now, completed_at=now,
+    )
+    db.add(run)
+    db.commit()
+
+    storage = get_storage()
+    digest = hashlib.sha256(content).hexdigest()
+    storage_path = f"runs/{run.id}/imported/{file_value.filename}"
+    storage.save(storage_path, content)
+    db.add(
+        RunFile(
+            run_id=run.id, slot="imported", original_filename=file_value.filename or "import.xlsx",
+            content_hash=digest, size_bytes=len(content), storage_path=storage_path, validation_ok=True,
+            validation_note="Imported from a previously-exported report",
+        )
+    )
+    db.add(RunArtifact(run_id=run.id, kind="excel_report", storage_path=storage_path))
+
+    for sheet in sheets:
+        db.add(
+            RunResult(
+                run_id=run.id, kind=sheet["kind"], sheet_name=sheet["name"], row_index=-1,
+                payload={"__meta__": True, "columns": sheet["columns"]},
+            )
+        )
+        for i, row in enumerate(sheet["rows"]):
+            db.add(RunResult(run_id=run.id, kind=sheet["kind"], sheet_name=sheet["name"], row_index=i, payload=row))
+
+    db.add(RunEvent(run_id=run.id, from_status="created", to_status="completed", message="Imported from a legacy Excel export"))
+    db.commit()
     db.refresh(run)
     return RunOut.model_validate(run)
 
@@ -164,11 +242,41 @@ def get_results(
         total=total,
         items=[
             RunResultOut(
-                kind=i.kind, sheet_name=i.sheet_name, columns=columns_by_sheet.get(i.sheet_name),
-                row_index=i.row_index, payload=i.payload,
+                id=i.id, kind=i.kind, sheet_name=i.sheet_name, columns=columns_by_sheet.get(i.sheet_name),
+                row_index=i.row_index, payload=i.payload, annotation_status=i.annotation_status,
+                annotation_note=i.annotation_note, annotation_at=i.annotation_at,
             )
             for i in items
         ],
+    )
+
+
+@router.patch("/{run_id}/results/{result_id}/annotate", response_model=RunResultOut)
+def annotate_result(
+    run_id: str,
+    result_id: str,
+    payload: AnnotateResultRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> RunResultOut:
+    """Bulk exception actions: acknowledge/resolve/note an exception row
+    without leaving the results table."""
+    _owned_run(db, run_id, user)
+    result = db.get(RunResult, result_id)
+    if result is None or result.run_id != run_id:
+        raise HTTPException(404, "Result row not found")
+
+    result.annotation_status = payload.status or None
+    result.annotation_note = payload.note
+    result.annotation_by = user.id
+    result.annotation_at = datetime.now(timezone.utc)
+    db.add(result)
+    db.commit()
+    db.refresh(result)
+    return RunResultOut(
+        id=result.id, kind=result.kind, sheet_name=result.sheet_name, columns=None, row_index=result.row_index,
+        payload=result.payload, annotation_status=result.annotation_status, annotation_note=result.annotation_note,
+        annotation_at=result.annotation_at,
     )
 
 

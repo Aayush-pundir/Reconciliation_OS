@@ -14,10 +14,14 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///./recon_os.db"
 
-    # Auth
+    # Auth - defaults to open access (internal tool, single org, no login screen).
+    # Set AUTH_REQUIRED=true to re-enable the login gate + JWT enforcement,
+    # e.g. if this ever runs on shared/exposed infra.
+    auth_required: bool = False
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 12
+    api_key_header: str = "X-API-Key"
 
     # Job execution: "inprocess" (zero infra, local dev) or "celery" (production)
     job_runner: str = "inprocess"
