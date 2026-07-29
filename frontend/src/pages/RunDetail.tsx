@@ -1,19 +1,23 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import StatusBadge from "@/components/StatusBadge";
 import ProgressStages from "@/components/ProgressStages";
 import StatCards from "@/components/StatCards";
 import ValidationPanel from "@/components/ValidationPanel";
 import DataTable from "@/components/DataTable";
+import { useToast } from "@/context/ToastContext";
+import { Skeleton, SkeletonCard } from "@/components/Skeleton";
 import type { StatCardPayload, ValidationFindingPayload } from "@/types";
 
 const ACTIVE_STATUSES = new Set(["queued", "parsing", "validating", "matching", "reporting"]);
 
 export default function RunDetail() {
   const { runId } = useParams<{ runId: string }>();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
   const runQuery = useQuery({
@@ -57,7 +61,12 @@ export default function RunDetail() {
 
   const rerunMutation = useMutation({
     mutationFn: () => api.rerun(runId!),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["runs"] }),
+    onSuccess: (run) => {
+      toast.success("Re-run queued.");
+      queryClient.invalidateQueries({ queryKey: ["runs"] });
+      navigate(`/runs/${run.id}`);
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to queue re-run"),
   });
 
   const annotateMutation = useMutation({
@@ -65,10 +74,22 @@ export default function RunDetail() {
       api.annotateResult(runId!, resultId, status, note),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["run", runId, "results", "sheet", activeTab] }),
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to save annotation"),
   });
 
   const run = runQuery.data;
-  if (!run) return <div className="text-sm text-ink-faint">Loading…</div>;
+  if (!run)
+    return (
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-6 w-1/3" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
 
   const stats: StatCardPayload[] = (summaryQuery.data?.items ?? []).map((i) => i.payload as unknown as StatCardPayload);
   const findings: ValidationFindingPayload[] = (validationQuery.data?.items ?? []).map(
@@ -148,6 +169,7 @@ export default function RunDetail() {
                   statusColumn="Status"
                   annotatable={sheetQuery.data.items[0]?.kind === "exception"}
                   onAnnotate={(resultId, status, note) => annotateMutation.mutate({ resultId, status, note })}
+                  sheetName={`${run.module_key}_${activeTab}`}
                 />
               )}
             </div>

@@ -3,6 +3,8 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "@/api/client";
 import FileDropzone from "@/components/FileDropzone";
+import { Skeleton } from "@/components/Skeleton";
+import { useToast } from "@/context/ToastContext";
 
 export default function ModuleRun() {
   const { moduleKey } = useParams<{ moduleKey: string }>();
@@ -10,6 +12,7 @@ export default function ModuleRun() {
   const modulesQuery = useQuery({ queryKey: ["modules"], queryFn: api.listModules });
   const module = modulesQuery.data?.find((m) => m.key === moduleKey);
 
+  const toast = useToast();
   const [filesBySlot, setFilesBySlot] = useState<Record<string, File[]>>({});
   const [options, setOptions] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
@@ -22,17 +25,41 @@ export default function ModuleRun() {
 
   const runMutation = useMutation({
     mutationFn: () => api.createRun(module!.key, options, filesBySlot),
-    onSuccess: (run) => navigate(`/runs/${run.id}`),
-    onError: (err) => setError(err instanceof ApiError ? err.message : "Failed to start run"),
+    onSuccess: (run) => {
+      toast.success("Reconciliation started.");
+      navigate(`/runs/${run.id}`);
+    },
+    onError: (err) => {
+      const message = err instanceof ApiError ? err.message : "Failed to start run";
+      setError(message);
+      toast.error(message);
+    },
   });
 
   const importMutation = useMutation({
     mutationFn: (file: File) => api.importReport(module!.key, file),
-    onSuccess: (run) => navigate(`/runs/${run.id}`),
-    onError: (err) => setImportError(err instanceof ApiError ? err.message : "Failed to import report"),
+    onSuccess: (run) => {
+      toast.success("Report imported.");
+      navigate(`/runs/${run.id}`);
+    },
+    onError: (err) => {
+      const message = err instanceof ApiError ? err.message : "Failed to import report";
+      setImportError(message);
+      toast.error(message);
+    },
   });
 
-  if (modulesQuery.isLoading) return <div className="text-sm text-ink-faint">Loading…</div>;
+  if (modulesQuery.isLoading)
+    return (
+      <div className="max-w-3xl flex flex-col gap-6">
+        <Skeleton className="h-5 w-1/3" />
+        <div className="card p-5 flex flex-col gap-4">
+          <Skeleton className="h-4 w-1/4" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      </div>
+    );
   if (!module) return <div className="text-sm text-bad">Unknown module.</div>;
 
   const ready = module.input_slots

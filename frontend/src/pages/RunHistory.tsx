@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import StatusBadge from "@/components/StatusBadge";
+import { Skeleton } from "@/components/Skeleton";
 
 const STATUS_OPTIONS = ["", "queued", "parsing", "validating", "matching", "reporting", "completed", "failed"];
 
@@ -57,6 +58,16 @@ export default function RunHistory() {
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border">
+            {runsQuery.isLoading &&
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i}>
+                  {Array.from({ length: 4 }).map((__, j) => (
+                    <td key={j} className="px-4 py-3">
+                      <Skeleton className="h-3 w-full" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
             {runs.map((r) => (
               <tr key={r.id} className="hover:bg-surface-muted">
                 <td className="px-4 py-2.5">
@@ -72,7 +83,7 @@ export default function RunHistory() {
                 <td className="px-4 py-2.5 text-ink-muted">{r.completed_at ? new Date(r.completed_at).toLocaleString() : "—"}</td>
               </tr>
             ))}
-            {runs.length === 0 && (
+            {!runsQuery.isLoading && runs.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-10 text-center text-ink-faint">
                   No runs match these filters.

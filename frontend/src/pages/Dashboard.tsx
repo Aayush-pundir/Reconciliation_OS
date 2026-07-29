@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import StatusBadge from "@/components/StatusBadge";
+import { Skeleton, SkeletonCard, SkeletonRow } from "@/components/Skeleton";
+import RunsTrendChart from "@/components/RunsTrendChart";
 
 const MODULE_ICONS: Record<string, string> = {
   nfs: "🏧",
@@ -15,10 +17,13 @@ const MODULE_ICONS: Record<string, string> = {
 
 export default function Dashboard() {
   const modulesQuery = useQuery({ queryKey: ["modules"], queryFn: api.listModules });
-  const runsQuery = useQuery({ queryKey: ["runs", "recent"], queryFn: () => api.listRuns({ limit: 8 }) });
+  // Fetch a wider recent window for the trend chart's daily aggregation;
+  // the activity feed below just shows the first 8 of these.
+  const runsQuery = useQuery({ queryKey: ["runs", "recent"], queryFn: () => api.listRuns({ limit: 200 }) });
 
-  const runs = runsQuery.data?.items ?? [];
-  const openExceptions = runs.filter((r) => r.status === "failed").length;
+  const allRuns = runsQuery.data?.items ?? [];
+  const runs = allRuns.slice(0, 8);
+  const openExceptions = allRuns.filter((r) => r.status === "failed").length;
 
   return (
     <div className="flex flex-col gap-8">
@@ -43,15 +48,23 @@ export default function Dashboard() {
         <div className="card px-4 py-3">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">In Progress</div>
           <div className="text-xl font-bold mt-0.5 text-brand-600">
-            {runs.filter((r) => !["completed", "failed"].includes(r.status)).length}
+            {allRuns.filter((r) => !["completed", "failed"].includes(r.status)).length}
           </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-sm font-bold text-ink-muted mb-3 uppercase tracking-wide">Run Activity — Last 14 Days</h2>
+        <div className="card p-5">
+          {runsQuery.isLoading ? <Skeleton className="h-32 w-full" /> : <RunsTrendChart runs={allRuns} />}
         </div>
       </div>
 
       <div>
         <h2 className="text-sm font-bold text-ink-muted mb-3 uppercase tracking-wide">Reconciliation Modules</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {modulesQuery.isLoading && <div className="text-sm text-ink-faint">Loading modules…</div>}
+          {modulesQuery.isLoading &&
+            Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
           {modulesQuery.data?.map((m) => (
             <Link key={m.key} to={`/modules/${m.key}`} className="card p-4 hover:border-brand-400 transition-colors group">
               <div className="flex items-start gap-3">
@@ -82,7 +95,10 @@ export default function Dashboard() {
           </Link>
         </div>
         <div className="card divide-y divide-surface-border">
-          {runs.length === 0 && <div className="px-4 py-6 text-sm text-ink-faint text-center">No runs yet.</div>}
+          {runsQuery.isLoading && Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={3} />)}
+          {!runsQuery.isLoading && runs.length === 0 && (
+            <div className="px-4 py-6 text-sm text-ink-faint text-center">No runs yet.</div>
+          )}
           {runs.map((r) => (
             <Link key={r.id} to={`/runs/${r.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-surface-muted">
               <div className="flex items-center gap-3">

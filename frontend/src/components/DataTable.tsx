@@ -16,6 +16,24 @@ interface Props {
   statusColumn?: string;
   annotatable?: boolean;
   onAnnotate?: (resultId: string, status: string, note: string) => void;
+  sheetName?: string;
+}
+
+function csvCell(value: unknown): string {
+  const text = value === null || value === undefined ? "" : String(value);
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadCsv(columns: string[], rows: Record<string, unknown>[], filename: string): void {
+  const lines = [columns.map(csvCell).join(",")];
+  for (const row of rows) lines.push(columns.map((c) => csvCell(row[c])).join(","));
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function formatCell(value: unknown): string {
@@ -118,7 +136,7 @@ function AnnotationCell({
   );
 }
 
-export default function DataTable({ columns, items, statusColumn, annotatable, onAnnotate }: Props) {
+export default function DataTable({ columns, items, statusColumn, annotatable, onAnnotate, sheetName }: Props) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
 
@@ -171,9 +189,24 @@ export default function DataTable({ columns, items, statusColumn, annotatable, o
           placeholder="Search…"
           className="input max-w-xs"
         />
-        <span className="text-xs text-ink-faint">
-          {table.getFilteredRowModel().rows.length} / {items.length} rows
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-ink-faint">
+            {table.getFilteredRowModel().rows.length} / {items.length} rows
+          </span>
+          <button
+            onClick={() =>
+              downloadCsv(
+                columns,
+                table.getFilteredRowModel().rows.map((r) => r.original.payload),
+                `${sheetName ?? "export"}.csv`
+              )
+            }
+            className="btn-ghost text-xs"
+            disabled={items.length === 0}
+          >
+            ⬇ CSV
+          </button>
+        </div>
       </div>
       <div className="overflow-auto max-h-[520px] rounded-lg border border-surface-border">
         <table className="w-full text-xs border-collapse">
