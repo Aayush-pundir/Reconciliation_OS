@@ -8,7 +8,11 @@ import RunDetail from "@/pages/RunDetail";
 import RunHistory from "@/pages/RunHistory";
 
 function ProtectedLayout() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  // No login screen by default (backend AUTH_REQUIRED=false resolves everyone
+  // to a shared local user via GET /api/auth/me) - only redirect to /login if
+  // that call actually failed, i.e. AUTH_REQUIRED was turned on server-side.
+  if (isLoading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <Layout />;
 }

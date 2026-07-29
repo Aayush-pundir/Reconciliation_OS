@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { getToken } from "@/api/client";
 
 const navItems = [
   { to: "/", label: "Dashboard", end: true },
@@ -45,9 +46,13 @@ export default function Layout() {
               <div className="text-sm font-medium leading-tight">{user?.name}</div>
               <div className="text-[11px] text-ink-faint leading-tight capitalize">{user?.role}</div>
             </div>
-            <button onClick={logout} className="btn-ghost text-xs">
-              Sign out
-            </button>
+            {/* Only shown if a login token is actually in play (AUTH_REQUIRED=true
+                server-side) - with auth optional (the default) there's nothing to sign out of. */}
+            {getToken() && (
+              <button onClick={logout} className="btn-ghost text-xs">
+                Sign out
+              </button>
+            )}
           </div>
         </div>
       </header>

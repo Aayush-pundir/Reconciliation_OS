@@ -55,6 +55,8 @@ export const api = {
   login: (email: string, password: string) =>
     request<TokenResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
 
+  me: () => request<User>("/auth/me"),
+
   listModules: () => request<ModuleSchema[]>("/modules"),
 
   createRun: (moduleKey: string, options: Record<string, unknown>, files: Record<string, File[]>) => {
